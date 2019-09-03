@@ -1,72 +1,82 @@
-docker-LTB-self-service-password
+docker-ssp
 ================================
 
-A dockerfile for the LDAP ToolBox (LTB) Self Service Password utility, which is a PHP application that allows users to change their password in an LDAP directory. See http://ltb-project.org/wiki/documentation/self-service-password
+LDAP ToolBox（LTB）自助服务密码实用程序的dockerfile，它是一个允许用户在LDAP目录中更改其密码的PHP应用程序。
 
-## Quick Start
-You can either run the image and link it to an external configuration file, or you can rebuild your own standalone image.
+## 参考
 
-#### Running from the image, i.e. the `--with-volume` way
-Pull the latest version of the image from the docker index. This is the recommended method of installation as it is easier to update image in the future. These builds are performed by the **Docker Trusted Build** service.
+[官方文档](http://ltb-project.org/wiki/documentation/self-service-password)
 
-```bash
-docker pull grams/ltb-self-service-password:0.8
-```
 
-Then, provide your own `config.inc.php` file, downloaded from   http://tools.ltb-project.org/projects/ltb/repository/entry/self-service-password/tags/0.8/conf/config.inc.php and modified according to your settings.
 
-You can now run container:
-* in foreground:
-```bash
-docker run -it --rm -p 8765:80 -v /path/to/config.inc.php:/usr/share/self-service-password/conf/config.inc.php grams/ltb-self-service-password:0.8
-```
-* as a daemon:
-```bash
-docker run -d -p 8765:80 -v /path/to/config.inc.php:/usr/share/self-service-password/conf/config.inc.php grams/ltb-self-service-password:0.8
-```
-
-The examples above expose service on port `8765`, so you can point your browser to http://hostname:8765/ in order to change LDAP passwords.
-
-#### Building the image yourself
+#### 构建自己的镜像
 
 ```bash
-git clone https://github.com/grams/docker-LTB-self-service-password.git
-cd docker-LTB-self-service-password
+git clone https://github.com/wandouduoduo/docker-ssp.git
+cd docker-ssp
 ```
-Edit `assets/config.inc.php` according to your local settings, then (re)build image with: 
+在本地编辑 `assets/config.inc.php` ，然后再构建镜像
 ```bash
-docker build -t="$USER/ltb-self-service-password" .
+docker build -t="$USER/ssp:1.0" .
 ```
-You can now run container:
-* in foreground:
+运行:
 ```bash
-docker run -it --rm -p 8765:80 $USER/ltb-self-service-password
-```
-* as a daemon:
-```bash
-docker run -d -p 8765:80 $USER/ltb-self-service-password
+docker run --name sunssp -p 10001:80 -d $USER/ssp:1.0
 ```
 
-## Troubleshooting
+## 问题
 
-#### What's going on ?
-You can debug LDAP connection problems by adding this line in  `config.inc.php`:
+我们可以在配置文件`config.inc.php`添加下面选项，来进行debug日志输出追踪:
 ```php
 ldap_set_option(NULL, LDAP_OPT_DEBUG_LEVEL, 7);
 ```
-Then inspect apache logs of a runnning container:
+进入容器中，查看apache日志:
 ```bash
-docker exec -ti $(docker ps | grep 'ltb-self-service-password' | awk '{print $1}') tail /var/log/apache2/error.log
+docker exec -ti $(docker ps | grep 'sunssp' | awk '{print $1}') tail -fn222 /var/log/apache2/error.log
 ```
 
-#### LDAPS with self-signed certificate
-When connecting with LDAPS protocol to a server wtih a self-signed certificate, you will see this error in apache logs:
-```
-TLS: peer cert untrusted or revoked (0x42)
-TLS: can't connect: (unknown error code).
-```
-Add this into `config.inc.php` to disable all certificate validation:
+## 模板范例
+
+`config.inc.php`
+
 ```php
-putenv('LDAPTLS_REQCERT=never');
+#关闭 问题验证 和 短信验证(视个人需要)：
+$use_questions=false;
+$use_sms= false;
+
+#配置 LDAP
+$ldap_url = "ldap://ldap.xxxxx.net";
+$ldap_starttls = false;
+$ldap_binddn = "cn=Manager,dc=ldap,dc=xxxxxx,dc=net";   
+$ldap_bindpw = "xxxxxxxxx";
+$ldap_base = "dc=ldap,dc=xxxxxx,dc=net";
+$ldap_login_attribute = "cn"; 
+$ldap_fullname_attribute = "cn"; 
+$ldap_filter = "(&(objectClass=person)($ldap_login_attribute={login}))";
+$who_change_password = "manager";   #指定LDAP 以什么用户身份更改密码
+#配置邮件
+$mail_from = "elk@xxxxx.com";
+$mail_from_name = "企业账号密码重置";
+$mail_signature = "";
+$notify_on_change = true;      #密码修改成功后，向用户发送通知邮件
+$mail_sendmailpath = '/usr/sbin/sendmail';   #需安装sendmail服务 yum install -y sendmail
+$mail_protocol = 'smtp'; 
+$mail_smtp_debug = 0;
+$mail_debug_format = 'html'; 
+$mail_smtp_host = 'smtp.gmail.com';
+$mail_smtp_auth = true; 
+$mail_smtp_user = 'elk@xxxxxx.com';
+$mail_smtp_pass = 'xxxxxx';
+$mail_smtp_port = 587;
+$mail_smtp_timeout = 30;
+$mail_smtp_keepalive = false;
+$mail_smtp_secure = 'tls';
+$mail_contenttype = 'text/plain';
+$mail_wordwrap = 0;
+$mail_charset = 'utf-8';
+$mail_priority = 3;
+$mail_newline = PHP_EOL;
 ```
+
+配置完成，登录网页访问，通过网页修改账号密码验证即可！！
 
